@@ -42,6 +42,15 @@ public class GUIUtilities
         // Description Text
         GUILayout.Label($"Mod {modName} is currently disabled. Enable it to access it's features.", DescriptionStyle);
     }
+
+    public void DrawModUnavailableContent(string modName, string reason)
+    {
+        // Section Header
+        GUILayout.Label($"Mod {modName} is not available", HeaderStyle);
+        
+        // Description Text
+        GUILayout.Label($"Mod {modName} is currently unavailable: {reason}", DescriptionStyle);
+    }
     
     public void DrawModSection(string header, string description, ref bool isEnabled, System.Action settingsAction)
     {

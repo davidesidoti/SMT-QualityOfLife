@@ -68,17 +68,24 @@ namespace SMTQualityOfLife
             // Check if mod is enabled
             if (_manager.NpcAdderEnabled.Value)
             {
-                // Start a scroll view in case content overflows
-                GUILayout.BeginScrollView(Vector2.zero, GUILayout.Width(630), GUILayout.Height(420));
-                
-                _guiUtilities.DrawIntButtonAddSection(
-                    "Max available NPC's",
-                    "Increase or decrease the max spawnable NPC's. This will only be possible when all of the NPC's upgrades have been purchased.",
-                    CurrentMaxNpc,
-                    OnAddButtonClicked,
-                    OnRemoveButtonClicked);
-                
-                GUILayout.EndScrollView();
+                if (CurrentMaxNpc >= 10)
+                {
+                    // Start a scroll view in case content overflows
+                    GUILayout.BeginScrollView(Vector2.zero, GUILayout.Width(630), GUILayout.Height(420));
+                    
+                    _guiUtilities.DrawIntButtonAddSection(
+                        "Max available NPC's",
+                        "Increase or decrease the max spawnable NPC's. This will only be possible when all of the NPC's upgrades have been purchased.",
+                        CurrentMaxNpc,
+                        OnAddButtonClicked,
+                        OnRemoveButtonClicked);
+                    
+                    GUILayout.EndScrollView();
+                }
+                else
+                {
+                    _guiUtilities.DrawModUnavailableContent("NPC Adder", "You need to unlock all possible NPC's upgrades first!");
+                }
             }
             else
             {
