@@ -89,11 +89,11 @@ namespace SMTQualityOfLife
             // Start a scroll view in case content overflows
             _scrollPosition = GUILayout.BeginScrollView(_scrollPosition, GUILayout.Width(630), GUILayout.Height(420));
 
-            _guiUtilities.DrawModSection(
-                "TwentyCents Mod",
-                "When enabled, the 25 cents at the checkout will be replaced with 20 cents",
-                ref _tempTwentyCentsToggle,
-                null);
+            // _guiUtilities.DrawModSection(
+            //     "TwentyCents Mod",
+            //     "When enabled, the 25 cents at the checkout will be replaced with 20 cents",
+            //     ref _tempTwentyCentsToggle,
+            //     null);
             
             _guiUtilities.DrawModSection(
                 "NPCAdder Mod",
@@ -107,11 +107,11 @@ namespace SMTQualityOfLife
                 ref _tempLowProductCountToggle,
                 OpenLowCountProductsSettings);
             
-            _guiUtilities.DrawModSection(
-                "SmartPrices Mod",
-                "This mod allows you to maximize your income by modifying the price set by the pricing machine to the highest price possible.",
-                ref _tempSmartPricesToggle,
-                OpenSmartPricesSettings);
+            // _guiUtilities.DrawModSection(
+            //     "SmartPrices Mod",
+            //     "This mod allows you to maximize your income by modifying the price set by the pricing machine to the highest price possible.",
+            //     ref _tempSmartPricesToggle,
+            //     OpenSmartPricesSettings);
 
             GUILayout.EndScrollView();
             
