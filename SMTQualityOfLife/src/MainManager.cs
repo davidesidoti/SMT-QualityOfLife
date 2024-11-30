@@ -10,21 +10,18 @@ namespace SMTQualityOfLife
         private readonly GUIUtilities _guiUtilities = new GUIUtilities();
         private Rect _windowRect = new Rect(0, 0, Mathf.Min(Screen.width, 650), Screen.height < 560 ? Screen.height : Screen.height - 100);
         private bool _showWindow;
+        private Vector2 _scrollPosition;
 
         private bool _tempTwentyCentsToggle;
         private bool _tempNpcAdderToggle;
         private bool _tempLowProductCountToggle;
         private bool _tempSmartPricesToggle;
         
-        // === MOD REFERENCES
-        private LowCountProducts _lowCountProducts;
-        private NPCAdder _npcAdder;
-        
         // === CONFIG STUFF
-        public readonly ConfigEntry<bool> TwentyCentsModEnabled;
+        private readonly ConfigEntry<bool> _twentyCentsModEnabled;
         public readonly ConfigEntry<bool> NpcAdderEnabled;
         public readonly ConfigEntry<bool> LowProductCountEnabled;
-        public readonly ConfigEntry<bool> SmartPricesEnabled;
+        private readonly ConfigEntry<bool> _smartPricesEnabled;
         
         // === OTHER STUFF
         private readonly ManualLogSource _logger;
@@ -32,7 +29,7 @@ namespace SMTQualityOfLife
         public MainManager(ConfigFile config, ManualLogSource logger)
         {
             _logger = logger;
-            TwentyCentsModEnabled = config.Bind(
+            _twentyCentsModEnabled = config.Bind(
                 "TwentyCentsMod",
                 "TwentyCents Mod",
                 false,
@@ -50,19 +47,16 @@ namespace SMTQualityOfLife
                 false,
                 "LowCountProducts Mod enabled");
             
-            SmartPricesEnabled = config.Bind(
+            _smartPricesEnabled = config.Bind(
                 "SmartPricesMod",
                 "SmartPrices Mod",
                 false,
                 "SmartPrices Mod enabled");
             
-            _tempTwentyCentsToggle = TwentyCentsModEnabled.Value;
+            _tempTwentyCentsToggle = _twentyCentsModEnabled.Value;
             _tempNpcAdderToggle = NpcAdderEnabled.Value;
             _tempLowProductCountToggle = LowProductCountEnabled.Value;
-            _tempSmartPricesToggle = SmartPricesEnabled.Value;
-
-            _lowCountProducts = new LowCountProducts(config, logger, this, _guiUtilities);
-            _npcAdder = new NPCAdder(config, logger, this, _guiUtilities);
+            _tempSmartPricesToggle = _smartPricesEnabled.Value;
         }
         
         public void SetWindowVisibility(bool visible)
@@ -93,13 +87,13 @@ namespace SMTQualityOfLife
             GUI.DragWindow(new Rect(0, 0, 10000, 20));
 
             // Start a scroll view in case content overflows
-            GUILayout.BeginScrollView(Vector2.zero, GUILayout.Width(630), GUILayout.Height(420));
+            _scrollPosition = GUILayout.BeginScrollView(_scrollPosition, GUILayout.Width(630), GUILayout.Height(420));
 
-            // _guiUtilities.DrawModSection(
-            //     "TwentyCents Mod",
-            //     "When enabled, the 25 cents at the checkout will be replaced with 20 cents",
-            //     ref _tempTwentyCentsToggle,
-            //     null);
+            _guiUtilities.DrawModSection(
+                "TwentyCents Mod",
+                "When enabled, the 25 cents at the checkout will be replaced with 20 cents",
+                ref _tempTwentyCentsToggle,
+                null);
             
             _guiUtilities.DrawModSection(
                 "NPCAdder Mod",
@@ -107,24 +101,24 @@ namespace SMTQualityOfLife
                 ref _tempNpcAdderToggle,
                 OpenNpcAdderSettings);
             
-            // _guiUtilities.DrawModSection(
-            //     "LowCountProducts Mod",
-            //     "This mod allows you to add all your low count products to the shopping cart at the manager blackboard by simply clicking a button.",
-            //     ref _tempLowProductCountToggle,
-            //     OpenLowCountProductsSettings);
-            //
-            // _guiUtilities.DrawModSection(
-            //     "SmartPrices Mod",
-            //     "This mod allows you to maximize your income by modifying the price set by the pricing machine to the highest price possible.",
-            //     ref _tempSmartPricesToggle,
-            //     OpenSmartPricesSettings);
+            _guiUtilities.DrawModSection(
+                "LowCountProducts Mod",
+                "This mod allows you to add all your low count products to the shopping cart at the manager blackboard by simply clicking a button.",
+                ref _tempLowProductCountToggle,
+                OpenLowCountProductsSettings);
+            
+            _guiUtilities.DrawModSection(
+                "SmartPrices Mod",
+                "This mod allows you to maximize your income by modifying the price set by the pricing machine to the highest price possible.",
+                ref _tempSmartPricesToggle,
+                OpenSmartPricesSettings);
 
             GUILayout.EndScrollView();
             
             // Update the config value based on the toggle state
-            if (TwentyCentsModEnabled.Value != _tempTwentyCentsToggle)
+            if (_twentyCentsModEnabled.Value != _tempTwentyCentsToggle)
             {
-                TwentyCentsModEnabled.Value = _tempTwentyCentsToggle;
+                _twentyCentsModEnabled.Value = _tempTwentyCentsToggle;
                 _logger.LogInfo($"TwentyCents Mod enabled: {_tempTwentyCentsToggle}");
             }
             
@@ -137,12 +131,13 @@ namespace SMTQualityOfLife
             if (LowProductCountEnabled.Value != _tempLowProductCountToggle)
             {
                 LowProductCountEnabled.Value = _tempLowProductCountToggle;
+                LowCountProducts.LowCountProductsState = LowProductCountEnabled.Value;
                 _logger.LogInfo($"Low Count Product Enabled: {_tempLowProductCountToggle}");
             }
 
-            if (SmartPricesEnabled.Value != _tempSmartPricesToggle)
+            if (_smartPricesEnabled.Value != _tempSmartPricesToggle)
             {
-                SmartPricesEnabled.Value = _tempSmartPricesToggle;
+                _smartPricesEnabled.Value = _tempSmartPricesToggle;
                 _logger.LogInfo($"Smart Prices Enabled: {_tempSmartPricesToggle}");
             }
         }

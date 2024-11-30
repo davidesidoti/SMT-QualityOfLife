@@ -12,6 +12,7 @@ namespace SMTQualityOfLife
         private readonly GUIUtilities _guiUtilities;
         private Rect _windowRect = new Rect(0, 0, Mathf.Min(Screen.width, 650), Screen.height < 560 ? Screen.height : Screen.height - 100);
         private bool _showWindow;
+        private Vector2 _scrollPosition;
         
         // === CLASS REFERENCES
         private readonly MainManager _manager;
@@ -71,7 +72,7 @@ namespace SMTQualityOfLife
                 if (CurrentMaxNpc >= 10)
                 {
                     // Start a scroll view in case content overflows
-                    GUILayout.BeginScrollView(Vector2.zero, GUILayout.Width(630), GUILayout.Height(420));
+                    _scrollPosition = GUILayout.BeginScrollView(_scrollPosition, GUILayout.Width(630), GUILayout.Height(420));
                     
                     _guiUtilities.DrawIntButtonAddSection(
                         "Max available NPC's",

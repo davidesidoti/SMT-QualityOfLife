@@ -36,7 +36,7 @@ namespace SMTQualityOfLife
                 (ConfigDescription.Empty));
             
             _mainManager = new MainManager(Config, Logger);
-            _lowCountProducts = new LowCountProducts(Config, Logger, _mainManager, new GUIUtilities());
+            _lowCountProducts = new LowCountProducts(Config, _mainManager, new GUIUtilities());
             _npcAdder = new NPCAdder(Config, Logger, _mainManager, new GUIUtilities());
             
             IsMainWindowEnabled = Config.Bind(

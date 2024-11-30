@@ -37,6 +37,9 @@
     <Reference Include="Mirror">
       <HintPath>lib\Mirror.dll</HintPath>
     </Reference>
+    <Reference Include="PlayMaker">
+      <HintPath>lib\PlayMaker.dll</HintPath>
+    </Reference>
     <Reference Include="Unity.TextMeshPro">
       <HintPath>lib\Unity.TextMeshPro.dll</HintPath>
     </Reference>
