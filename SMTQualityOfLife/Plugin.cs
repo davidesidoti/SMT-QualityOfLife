@@ -27,12 +27,32 @@ namespace SMTQualityOfLife
         
         // === KEYBOARD SHORTCUTS
         private static ConfigEntry<KeyboardShortcut> _keyboardShortcutEnableMainWindow;
+        private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpBlackboard;
+        private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpAchievements;
+        private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpSkills;
+        private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpNpcManager;
+        private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpButtonsBar;
             
         private void Awake()
         {
             // KEYBOARD SHORTCUTS START-UP
             _keyboardShortcutEnableMainWindow = Config.Bind("General",
                 "KeyboardShortcutEnableMainWindowKey", new KeyboardShortcut(KeyCode.H, new[] { KeyCode.LeftControl }),
+                (ConfigDescription.Empty));
+            _keyboardShortcutDumpBlackboard = Config.Bind("General",
+                "KeyboardShortcutDumpBlackboard", new KeyboardShortcut(KeyCode.F7, new[] { KeyCode.LeftControl }),
+                (ConfigDescription.Empty));
+            _keyboardShortcutDumpAchievements = Config.Bind("General",
+                "KeyboardShortcutDumpAchievements", new KeyboardShortcut(KeyCode.F8, new[] { KeyCode.LeftControl }),
+                (ConfigDescription.Empty));
+            _keyboardShortcutDumpSkills = Config.Bind("General",
+                "KeyboardShortcutDumpSkills", new KeyboardShortcut(KeyCode.F9, new[] { KeyCode.LeftControl }),
+                (ConfigDescription.Empty));
+            _keyboardShortcutDumpNpcManager = Config.Bind("General",
+                "KeyboardShortcutDumpNpcManager", new KeyboardShortcut(KeyCode.F10, new[] { KeyCode.LeftControl }),
+                (ConfigDescription.Empty));
+            _keyboardShortcutDumpButtonsBar = Config.Bind("General",
+                "KeyboardShortcutDumpButtonsBar", new KeyboardShortcut(KeyCode.F11, new[] { KeyCode.LeftControl }),
                 (ConfigDescription.Empty));
             
             _mainManager = new MainManager(Config, Logger);
@@ -88,6 +108,66 @@ namespace SMTQualityOfLife
                     IsNpcAdderWindowEnabled.Value = false;
                     Cursor.lockState = CursorLockMode.None;
                     Cursor.visible = true;
+                }
+            }
+
+            if (_keyboardShortcutDumpBlackboard.Value.IsDown())
+            {
+                try
+                {
+                    DebugBlackboard.DumpManagerBlackboard();
+                }
+                catch (System.Exception ex)
+                {
+                    Logger.LogError($"Blackboard debug failed: {ex}");
+                }
+            }
+
+            if (_keyboardShortcutDumpAchievements.Value.IsDown())
+            {
+                try
+                {
+                    DebugBlackboard.DumpAchievementsAndEmployees();
+                }
+                catch (System.Exception ex)
+                {
+                    Logger.LogError($"Achievements debug failed: {ex}");
+                }
+            }
+
+            if (_keyboardShortcutDumpSkills.Value.IsDown())
+            {
+                try
+                {
+                    DebugBlackboard.DumpSkillSystems();
+                }
+                catch (System.Exception ex)
+                {
+                    Logger.LogError($"Skills debug failed: {ex}");
+                }
+            }
+
+            if (_keyboardShortcutDumpNpcManager.Value.IsDown())
+            {
+                try
+                {
+                    DebugBlackboard.DumpNpcManager();
+                }
+                catch (System.Exception ex)
+                {
+                    Logger.LogError($"NPC Manager debug failed: {ex}");
+                }
+            }
+
+            if (_keyboardShortcutDumpButtonsBar.Value.IsDown())
+            {
+                try
+                {
+                    DebugBlackboard.DumpButtonsBar();
+                }
+                catch (System.Exception ex)
+                {
+                    Logger.LogError($"Buttons_Bar debug failed: {ex}");
                 }
             }
         }
