@@ -69,7 +69,7 @@ namespace SMTQualityOfLife
             // Check if mod is enabled
             if (_manager.NpcAdderEnabled.Value)
             {
-                if (CurrentMaxNpc >= 10)
+                if (NpcUpgradeGating.EmployeeExtrasUnlocked())
                 {
                     // Start a scroll view in case content overflows
                     _scrollPosition = GUILayout.BeginScrollView(_scrollPosition, GUILayout.Width(630), GUILayout.Height(420));
@@ -85,7 +85,7 @@ namespace SMTQualityOfLife
                 }
                 else
                 {
-                    _guiUtilities.DrawModUnavailableContent("NPC Adder", "You need to unlock all possible NPC's upgrades first!");
+                    _guiUtilities.DrawModUnavailableContent("NPC Adder", "Unlock all Extra Employee upgrades to use this.");
                 }
             }
             else
@@ -125,6 +125,7 @@ namespace SMTQualityOfLife.Patches
     [HarmonyPatch(typeof(NPC_Manager))]
     internal class SmtQualityOfLifeNpcManager
     {
+        private static bool _updateBoardWarned;
         [HarmonyPatch("FixedUpdate")]
         [HarmonyPostfix]
         public static void FixedUpdatePostfix(NPC_Manager __instance)
@@ -148,7 +149,25 @@ namespace SMTQualityOfLife.Patches
                     }
                     
                     __instance.maxEmployees = NPCAdder.NewMaxNpc;
-                    __instance.UpdateEmployeesNumberInBlackboard();
+                    // Use reflection to avoid hard dependency on removed method
+                    var updateMethod = AccessTools.Method(__instance.GetType(), "UpdateEmployeesNumberInBlackboard");
+                    if (updateMethod != null)
+                    {
+                        try { updateMethod.Invoke(__instance, System.Array.Empty<object>()); }
+                        catch (System.Exception ex)
+                        {
+                            if (!_updateBoardWarned)
+                            {
+                                NPCAdder.Logger?.LogWarning($"NPCAdder: UpdateEmployeesNumberInBlackboard invoke failed: {ex.Message}");
+                                _updateBoardWarned = true;
+                            }
+                        }
+                    }
+                    else if (!_updateBoardWarned)
+                    {
+                        NPCAdder.Logger?.LogWarning("NPCAdder: UpdateEmployeesNumberInBlackboard missing; skipping UI update.");
+                        _updateBoardWarned = true;
+                    }
                 }
             }
         }

@@ -132,67 +132,112 @@ namespace SMTQualityOfLife.Patches
             if (LowCountProducts.LowCountProductsState)
             {
                 // === start: ADD LOW COUNT BUTTON
-                GameObject buttonsBar = GameObject.Find("Buttons_Bar");
-                if (buttonsBar.transform.Find("AddLowCountProductsButton") == null)
+                if (GameObject.Find("AddLowCountProductsButton") == null)
                 {
+                    GameObject buttonsBar = GameObject.Find("Buttons_Bar");
                     if (buttonsBar != null)
                     {
-                        GameObject existingButton = buttonsBar.transform.Find("Button_Supermarket")?.gameObject;
-                        if (existingButton != null)
+                        // Try to locate the "Buy Empty Box" button anywhere in the scene first
+                        Transform sceneLabelAnchor = FindButtonByLabel(new[] {"buy empty box", "empty box", "empty"});
+                        if (sceneLabelAnchor != null && sceneLabelAnchor.parent != null && sceneLabelAnchor.parent.Find("AddLowCountProductsButton") == null)
                         {
-                            // Clone existing button
-                            GameObject newButton = Object.Instantiate(existingButton, buttonsBar.transform);
+                            GameObject newButton = Object.Instantiate(sceneLabelAnchor.gameObject, sceneLabelAnchor.parent);
                             newButton.name = "AddLowCountProductsButton";
-                            
+                            SetupLowCountButton(newButton, sceneLabelAnchor, sceneLabelAnchor.parent);
+                            return; // created successfully in correct panel
+                        }
+
+                        // Prefer anchoring next to the "Buy Empty Box" button (by name or label text)
+                        Transform anchor = FindButtonAnchor(buttonsBar.transform, new[] {"empty", "buy empty", "emptybox"});
+                        if (anchor == null)
+                        {
+                            // Fallback to supermarket button
+                            anchor = buttonsBar.transform.Find("Button_Supermarket");
+                        }
+
+                        GameObject templateButton = anchor != null ? anchor.gameObject : buttonsBar.GetComponentInChildren<Button>(true)?.gameObject;
+                        if (templateButton != null)
+                        {
+                            // Clone template
+                            GameObject newButton = Object.Instantiate(templateButton, buttonsBar.transform);
+                            newButton.name = "AddLowCountProductsButton";
+
                             // Remove the PlayMakerFSM component to prevent old event listeners
                             PlayMakerFSM fsm = newButton.GetComponent<PlayMakerFSM>();
                             if (fsm != null)
                             {
                                 Object.Destroy(fsm);
                             }
-                            
-                            // Adjust the button's position (optional)
-                            RectTransform rectTransform = newButton.GetComponent<RectTransform>();
-                            rectTransform.anchoredPosition += new Vector2(560, 0);
-                            
-                            // Change the button's text
-                            GameObject newButtonTextObj = newButton.transform.Find("Supermarket_Text").gameObject;
-                            newButtonTextObj.name = "AddLowCountProductsText";
-                            TextMeshProUGUI newButtonText = newButtonTextObj.GetComponent<TextMeshProUGUI>();
+
+                            // Smaller size: scale down slightly
+                            newButton.transform.localScale = new Vector3(0.85f, 0.85f, 1f);
+
+                            // Change the button's text (find any TMP child)
+                            TextMeshProUGUI newButtonText = newButton.GetComponentInChildren<TextMeshProUGUI>(true);
                             if (newButtonText != null)
                             {
-                                // Remove the SetLocalizationString component
-                                SetLocalizationString localizationComponent = newButtonTextObj.GetComponent<SetLocalizationString>();
+                                // Remove localization component if present
+                                SetLocalizationString localizationComponent = newButtonText.GetComponent<SetLocalizationString>();
                                 if (localizationComponent != null)
                                 {
                                     Object.Destroy(localizationComponent);
                                 }
-
                                 newButtonText.text = "Add Low Count Products";
-                            }
-                            
-                            // Remove existing onClick listeners
-                            Button buttonComponent = newButton.GetComponent<Button>();
-                            buttonComponent.onClick.RemoveAllListeners();
-                            
-                            // Add new onClick listener
-                            buttonComponent.onClick.AddListener(() =>
-                            {
-                                if (!LowCountProducts.AddLowCountProducts)
+                                // Slightly reduce font if autosizing is off
+                                if (!newButtonText.enableAutoSizing)
                                 {
-                                    // Plugin.Logger.LogInfo("Added low count products to cart via button.");
-                                    LowCountProducts.AddLowCountProducts = true;
+                                    newButtonText.fontSize = Mathf.Max(10, newButtonText.fontSize - 2);
                                 }
-                            });
+                            }
+
+                            // Position: place next to anchor if available
+                            var layout = buttonsBar.GetComponent<HorizontalLayoutGroup>();
+                            var grid = buttonsBar.GetComponent<GridLayoutGroup>();
+                            if (anchor != null)
+                            {
+                                // Maintain sibling order (layout groups handle placement)
+                                newButton.transform.SetSiblingIndex(anchor.GetSiblingIndex() + 1);
+
+                                // If no layout, offset by anchor width
+                                if (layout == null && grid == null)
+                                {
+                                    RectTransform anchorRt = anchor.GetComponent<RectTransform>();
+                                    RectTransform newRt = newButton.GetComponent<RectTransform>();
+                                    if (anchorRt != null && newRt != null)
+                                    {
+                                        float spacing = 10f;
+                                        var newPos = anchorRt.anchoredPosition + new Vector2(anchorRt.rect.width + spacing, 0);
+                                        newRt.anchoredPosition = newPos;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // No anchor found: try to append at end; if no layout, place near first button
+                                if (layout == null && grid == null)
+                                {
+                                    RectTransform refRt = templateButton != null ? templateButton.GetComponent<RectTransform>() : null;
+                                    if (refRt == null)
+                                    {
+                                        var anyBtn = buttonsBar.GetComponentInChildren<Button>(true);
+                                        refRt = anyBtn != null ? anyBtn.GetComponent<RectTransform>() : null;
+                                    }
+                                    RectTransform newRt = newButton.GetComponent<RectTransform>();
+                                    if (refRt != null && newRt != null)
+                                    {
+                                        float spacing = 10f;
+                                        var newPos = refRt.anchoredPosition + new Vector2(refRt.rect.width + spacing, 0);
+                                        newRt.anchoredPosition = newPos;
+                                    }
+                                }
+                            }
+
+                            FinalizeLowCountButton(newButton);
                         }
                         else
                         {
-                            Debug.LogError("Existing button not found to clone.");
+                            Debug.LogError("Template button not found to clone.");
                         }
-                    }
-                    else
-                    {
-                        Debug.LogError("Buttons_Bar not found in ManagerBlackboard.");
                     }
                 }
                 // === end: ADD LOW COUNT BUTTON
@@ -255,12 +300,151 @@ namespace SMTQualityOfLife.Patches
             else
             {
                 // Remove button from ui if mod is disabled
-                GameObject buttonsBar = GameObject.Find("Buttons_Bar");
-                if (buttonsBar.transform.Find("AddLowCountProductsButton") != null)
+                GameObject addLowBtn = GameObject.Find("AddLowCountProductsButton");
+                if (addLowBtn != null)
                 {
-                    GameObject addLowCountProductsButton = buttonsBar.transform.Find("AddLowCountProductsButton").gameObject;
-                    Object.Destroy(addLowCountProductsButton);
+                    Object.Destroy(addLowBtn);
                 }
+            }
+        }
+
+        private static Transform FindButtonAnchor(Transform root, string[] keywords)
+        {
+            if (root == null || keywords == null || keywords.Length == 0) return null;
+
+            // Depth-first search for a Button whose name or label matches keywords
+            Transform MatchIn(Transform t)
+            {
+                string n = t.name.ToLowerInvariant();
+                foreach (var k in keywords)
+                {
+                    if (string.IsNullOrEmpty(k)) continue;
+                    if (n.Contains(k)) return t;
+                }
+
+                // Look for text label matches
+                var tmp = t.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (tmp != null && !string.IsNullOrEmpty(tmp.text))
+                {
+                    string txt = tmp.text.ToLowerInvariant();
+                    foreach (var k in keywords)
+                    {
+                        if (!string.IsNullOrEmpty(k) && txt.Contains(k)) return t;
+                    }
+                }
+                return null;
+            }
+
+            Transform result = null;
+            void Dfs(Transform t)
+            {
+                if (result != null) return;
+                if (t.GetComponent<Button>() != null)
+                {
+                    var m = MatchIn(t);
+                    if (m != null) { result = m; return; }
+                }
+                foreach (Transform c in t)
+                {
+                    Dfs(c);
+                    if (result != null) return;
+                }
+            }
+            Dfs(root);
+            return result;
+        }
+
+        private static Transform FindButtonByLabel(string[] keywords)
+        {
+            try
+            {
+                var buttons = Object.FindObjectsOfType<Button>(true);
+                foreach (var btn in buttons)
+                {
+                    if (btn == null) continue;
+                    var t = btn.transform;
+                    string n = t.name.ToLowerInvariant();
+                    foreach (var k in keywords)
+                    {
+                        if (string.IsNullOrEmpty(k)) continue;
+                        var key = k.ToLowerInvariant();
+                        if (n.Contains(key)) return t;
+                    }
+
+                    var tmp = t.GetComponentInChildren<TextMeshProUGUI>(true);
+                    if (tmp != null && !string.IsNullOrEmpty(tmp.text))
+                    {
+                        string txt = tmp.text.ToLowerInvariant();
+                        foreach (var k in keywords)
+                        {
+                            if (!string.IsNullOrEmpty(k) && txt.Contains(k.ToLowerInvariant()))
+                                return t;
+                        }
+                    }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private static void SetupLowCountButton(GameObject newButton, Transform anchor, Transform container)
+        {
+            // Remove FSM
+            PlayMakerFSM fsm = newButton.GetComponent<PlayMakerFSM>();
+            if (fsm != null) Object.Destroy(fsm);
+
+            // Smaller size
+            newButton.transform.localScale = new Vector3(0.85f, 0.85f, 1f);
+
+            // Label text
+            TextMeshProUGUI newButtonText = newButton.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (newButtonText != null)
+            {
+                var loc = newButtonText.GetComponent<SetLocalizationString>();
+                if (loc != null) Object.Destroy(loc);
+                newButtonText.text = "Add Low Count Products";
+                if (!newButtonText.enableAutoSizing) newButtonText.fontSize = Mathf.Max(10, newButtonText.fontSize - 2);
+            }
+
+            // Position next to anchor
+            var layout = container.GetComponent<HorizontalLayoutGroup>();
+            var grid = container.GetComponent<GridLayoutGroup>();
+            if (anchor != null)
+            {
+                newButton.transform.SetSiblingIndex(anchor.GetSiblingIndex() + 1);
+                if (layout == null && grid == null)
+                {
+                    RectTransform anchorRt = anchor.GetComponent<RectTransform>();
+                    RectTransform newRt = newButton.GetComponent<RectTransform>();
+                    if (anchorRt != null && newRt != null)
+                    {
+                        float spacing = 10f;
+                        newRt.anchoredPosition = anchorRt.anchoredPosition + new Vector2(anchorRt.rect.width + spacing, 0);
+                    }
+                }
+            }
+
+            FinalizeLowCountButton(newButton);
+        }
+
+        private static void FinalizeLowCountButton(GameObject newButton)
+        {
+            newButton.SetActive(true);
+            var le = newButton.GetComponent<LayoutElement>();
+            if (le != null && le.preferredWidth > 0)
+            {
+                le.preferredWidth *= 0.85f; // match visual scale
+            }
+
+            var buttonComponent = newButton.GetComponent<Button>();
+            if (buttonComponent != null)
+            {
+                buttonComponent.onClick.RemoveAllListeners();
+                buttonComponent.onClick.AddListener(() =>
+                {
+                    if (!LowCountProducts.AddLowCountProducts)
+                        LowCountProducts.AddLowCountProducts = true;
+                });
             }
         }
         
