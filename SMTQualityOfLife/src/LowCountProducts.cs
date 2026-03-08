@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -241,12 +242,9 @@ namespace SMTQualityOfLife.Patches
                     }
                 }
                 // === end: ADD LOW COUNT BUTTON
-                
+
                 if (LowCountProducts.AddLowCountProducts)
                 {
-                    // Explore the Buttons_Bar GameObject
-                    // ExploreGameObject(buttonsBar);
-                    
                     LowCountProducts.AddLowCountProducts = false;
 
                     Dictionary<int, Dictionary<string, object>> lowProductList = new Dictionary<int, Dictionary<string, object>>();
@@ -254,35 +252,47 @@ namespace SMTQualityOfLife.Patches
                     ProductListing productListing = __instance.GetComponent<ProductListing>();
                     if (productListing == null)
                     {
-                        Debug.LogError("ProductListing component not found on ManagerBlackboard.");
+                        Debug.LogError("[SMT QoL] ProductListing component not found on ManagerBlackboard.");
+                        return;
+                    }
+
+                    // Access productsData array via reflection (was productPrefabs before game update)
+                    var productsDataField = AccessTools.Field(typeof(ProductListing), "productsData");
+                    if (productsDataField == null)
+                    {
+                        Debug.LogError("[SMT QoL] ProductListing.productsData field not found.");
+                        return;
+                    }
+                    Array productsData = productsDataField.GetValue(productListing) as Array;
+                    if (productsData == null)
+                    {
+                        Debug.LogError("[SMT QoL] ProductListing.productsData is null.");
                         return;
                     }
 
                     // Iterate over unlocked products
                     foreach (int productID in productListing.availableProducts)
                     {
-                        GameObject productPrefab = productListing.productPrefabs[productID];
-                        if (productPrefab != null)
+                        if (productID < 0 || productID >= productsData.Length) continue;
+
+                        int[] quantities = GetProductsExistences(__instance, productID);
+
+                        int shelvesQuantity = quantities[0];
+                        int storageQuantity = quantities[1];
+                        int boxesQuantity = quantities[2];
+
+                        if (shelvesQuantity <= LowCountProducts.LowCountProductsThreshold.Value && storageQuantity == 0 && boxesQuantity == 0)
                         {
-                            int[] quantities = GetProductsExistences(__instance, productID);
-
-                            int shelvesQuantity = quantities[0];
-                            int storageQuantity = quantities[1];
-                            int boxesQuantity = quantities[2];
-
-                            if (shelvesQuantity <= LowCountProducts.LowCountProductsThreshold.Value && storageQuantity == 0 && boxesQuantity == 0)
+                            if (!lowProductList.ContainsKey(productID))
                             {
-                                if (!lowProductList.ContainsKey(productID))
+                                string price = GetProductPriceFromData(productsData, productListing.tierInflation, productID);
+                                Dictionary<string, object> productInfo = new Dictionary<string, object>
                                 {
-                                    string price = GetProductPrice(productListing, productID);
-                                    Dictionary<string, object> productInfo = new Dictionary<string, object>
-                                    {
-                                        { "ID", productID },
-                                        { "price", price }
-                                    };
+                                    { "ID", productID },
+                                    { "price", price }
+                                };
 
-                                    lowProductList[productID] = productInfo;
-                                }
+                                lowProductList[productID] = productInfo;
                             }
                         }
                     }
@@ -464,18 +474,48 @@ namespace SMTQualityOfLife.Patches
             }
         }
         
-        private static string GetProductPrice(ProductListing productListing, int productID)
+        // Cached reflection fields for ProductData struct (resolved once)
+        private static FieldInfo _pdBasePriceField;
+        private static FieldInfo _pdProductTierField;
+        private static FieldInfo _pdMaxItemsField;
+        private static bool _pdFieldsResolved;
+
+        private static string GetProductPriceFromData(Array productsData, float[] tierInflation, int productID)
         {
-            GameObject productPrefab = productListing.productPrefabs[productID];
+            if (productID < 0 || productID >= productsData.Length)
+                return "$0.00";
 
-            float basePricePerUnit = productPrefab.GetComponent<Data_Product>().basePricePerUnit;
-            int productTier = productPrefab.GetComponent<Data_Product>().productTier;
+            object entry = productsData.GetValue(productID);
+            if (entry == null) return "$0.00";
 
-            float inflationFactor = productListing.tierInflation[productTier];
+            // Resolve ProductData fields once via reflection
+            if (!_pdFieldsResolved)
+            {
+                var elemType = entry.GetType();
+                _pdBasePriceField = AccessTools.Field(elemType, "basePricePerUnit");
+                _pdProductTierField = AccessTools.Field(elemType, "productTier");
+                _pdMaxItemsField = AccessTools.Field(elemType, "maxItemsPerBox");
+                _pdFieldsResolved = true;
+
+                if (_pdBasePriceField == null || _pdProductTierField == null || _pdMaxItemsField == null)
+                {
+                    Debug.LogError("[SMT QoL] ProductData fields not found: " +
+                        $"basePricePerUnit={_pdBasePriceField != null}, " +
+                        $"productTier={_pdProductTierField != null}, " +
+                        $"maxItemsPerBox={_pdMaxItemsField != null}");
+                }
+            }
+
+            if (_pdBasePriceField == null || _pdProductTierField == null || _pdMaxItemsField == null)
+                return "$0.00";
+
+            float basePricePerUnit = (float)_pdBasePriceField.GetValue(entry);
+            int productTier = (int)_pdProductTierField.GetValue(entry);
+            int maxItemsPerBox = (int)_pdMaxItemsField.GetValue(entry);
+
+            float inflationFactor = (productTier >= 0 && productTier < tierInflation.Length)
+                ? tierInflation[productTier] : 1f;
             float pricePerUnit = Mathf.Round(basePricePerUnit * inflationFactor * 100f) / 100f;
-
-            int maxItemsPerBox = productPrefab.GetComponent<Data_Product>().maxItemsPerBox;
-
             float boxPrice = Mathf.Round(pricePerUnit * maxItemsPerBox * 100f) / 100f;
 
             return "$" + boxPrice.ToString("F2", CultureInfo.InvariantCulture);

@@ -443,6 +443,197 @@ namespace SMTQualityOfLife
             TryWriteToDumpFile(text);
         }
 
+        public static void DumpProductListing()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("[SMT QoL] ===== ProductListing Dump =====");
+            sb.AppendLine($"Time: {DateTime.Now:O}");
+
+            var mb = Object.FindObjectOfType<ManagerBlackboard>();
+            if (mb == null)
+            {
+                sb.AppendLine("ManagerBlackboard not found in scene.");
+                EmitDump(sb);
+                return;
+            }
+
+            var productListing = mb.GetComponent<ProductListing>();
+            if (productListing == null)
+            {
+                sb.AppendLine("ProductListing component not found on ManagerBlackboard.");
+                EmitDump(sb);
+                return;
+            }
+
+            var t = productListing.GetType();
+            sb.AppendLine($"Type: {t.FullName}");
+
+            // Dump ALL fields so we can see what productPrefabs was renamed to
+            sb.AppendLine("--- ALL FIELDS ---");
+            var fields = t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            foreach (var f in fields)
+            {
+                object val = SafeGet(() => f.GetValue(productListing));
+                string valStr = SummarizeValue(f.FieldType, val);
+                sb.AppendLine($"  Field: {f.FieldType.Name} {f.Name} = {valStr}");
+            }
+
+            // Dump ALL properties
+            sb.AppendLine("--- ALL PROPERTIES ---");
+            var props = t.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            foreach (var p in props)
+            {
+                if (p.GetIndexParameters().Length > 0)
+                {
+                    sb.AppendLine($"  Prop: {p.PropertyType.Name} {p.Name} [indexed, skipped]");
+                    continue;
+                }
+                object val = SafeGet(() => p.GetValue(productListing));
+                string valStr = SummarizeValue(p.PropertyType, val);
+                sb.AppendLine($"  Prop: {p.PropertyType.Name} {p.Name} = {valStr}");
+            }
+
+            // Highlight GameObject[] fields (likely productPrefabs successor)
+            sb.AppendLine("--- GameObject[] FIELDS (candidates for productPrefabs) ---");
+            foreach (var f in fields)
+            {
+                if (f.FieldType == typeof(GameObject[]))
+                {
+                    var arr = SafeGet(() => f.GetValue(productListing)) as GameObject[];
+                    if (arr == null) { sb.AppendLine($"  {f.Name} = <null>"); continue; }
+                    sb.AppendLine($"  {f.Name} (GameObject[] len={arr.Length})");
+                    int limit = Math.Min(arr.Length, 10);
+                    for (int i = 0; i < limit; i++)
+                    {
+                        var go = arr[i];
+                        sb.AppendLine($"    [{i}] = {(go != null ? go.name : "<null>")}");
+                    }
+                    if (arr.Length > limit) sb.AppendLine($"    ... ({arr.Length - limit} more)");
+                }
+            }
+
+            // Highlight float[] fields (likely tierInflation successor)
+            sb.AppendLine("--- float[] FIELDS (candidates for tierInflation) ---");
+            foreach (var f in fields)
+            {
+                if (f.FieldType == typeof(float[]))
+                {
+                    var arr = SafeGet(() => f.GetValue(productListing)) as float[];
+                    if (arr == null) { sb.AppendLine($"  {f.Name} = <null>"); continue; }
+                    sb.AppendLine($"  {f.Name} (float[] len={arr.Length})");
+                    int limit = Math.Min(arr.Length, 20);
+                    for (int i = 0; i < limit; i++)
+                    {
+                        sb.AppendLine($"    [{i}] = {arr[i]}");
+                    }
+                    if (arr.Length > limit) sb.AppendLine($"    ... ({arr.Length - limit} more)");
+                }
+            }
+
+            // Check if availableProducts still exists
+            sb.AppendLine("--- availableProducts check ---");
+            var avField = AccessTools.Field(t, "availableProducts");
+            if (avField != null)
+            {
+                var avVal = SafeGet(() => avField.GetValue(productListing));
+                sb.AppendLine($"  availableProducts exists: type={avField.FieldType.Name}, value={avVal}");
+            }
+            else
+            {
+                sb.AppendLine("  availableProducts field NOT FOUND");
+                // Look for List<int> or int[] fields as candidates
+                foreach (var f in fields)
+                {
+                    if (f.FieldType == typeof(int[]) || f.FieldType == typeof(System.Collections.Generic.List<int>))
+                    {
+                        sb.AppendLine($"  Candidate: {f.FieldType.Name} {f.Name}");
+                    }
+                }
+            }
+
+            // Dump ProductData type structure and sample entries
+            sb.AppendLine("--- ProductData TYPE INSPECTION ---");
+            var pdField = AccessTools.Field(t, "productsData");
+            if (pdField != null)
+            {
+                var pdArray = SafeGet(() => pdField.GetValue(productListing));
+                if (pdArray is Array arr && arr.Length > 0)
+                {
+                    // Inspect the element type
+                    var elemType = pdField.FieldType.GetElementType();
+                    sb.AppendLine($"  Element type: {elemType?.FullName}");
+
+                    // Dump all fields of ProductData
+                    if (elemType != null)
+                    {
+                        sb.AppendLine("  ProductData FIELDS:");
+                        foreach (var pf in elemType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+                        {
+                            sb.AppendLine($"    {pf.FieldType.Name} {pf.Name}");
+                        }
+                        sb.AppendLine("  ProductData PROPERTIES:");
+                        foreach (var pp in elemType.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+                        {
+                            sb.AppendLine($"    {pp.PropertyType.Name} {pp.Name}");
+                        }
+
+                        // Dump a few sample entries to see actual values
+                        sb.AppendLine("  ProductData SAMPLE ENTRIES (first 5):");
+                        int sampleLimit = Math.Min(arr.Length, 5);
+                        var pdFields = elemType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        for (int i = 0; i < sampleLimit; i++)
+                        {
+                            var entry = arr.GetValue(i);
+                            if (entry == null) { sb.AppendLine($"    [{i}] = <null>"); continue; }
+                            sb.AppendLine($"    [{i}]:");
+                            foreach (var pf in pdFields)
+                            {
+                                var fv = SafeGet(() => pf.GetValue(entry));
+                                sb.AppendLine($"      {pf.Name} = {fv}");
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    sb.AppendLine("  productsData is null or empty");
+                }
+            }
+            else
+            {
+                sb.AppendLine("  productsData field NOT FOUND");
+            }
+
+            EmitDump(sb);
+        }
+
+        private static string SummarizeValue(Type type, object val)
+        {
+            if (val == null) return "<null>";
+            if (type.IsArray)
+            {
+                var arr = (Array)val;
+                return $"[{type.GetElementType()?.Name}[] len={arr.Length}]";
+            }
+            if (typeof(System.Collections.IEnumerable).IsAssignableFrom(type) && type != typeof(string))
+            {
+                int count = 0;
+                foreach (var _ in (System.Collections.IEnumerable)val) count++;
+                return $"[{type.Name} count={count}]";
+            }
+            return val.ToString();
+        }
+
+        private static void EmitDump(StringBuilder sb)
+        {
+            var text = sb.ToString();
+            foreach (var chunk in Chunk(text, 800))
+            {
+                Debug.Log(chunk);
+            }
+            TryWriteToDumpFile(text);
+        }
+
         private static void DumpUIHierarchy(Transform t, StringBuilder sb, int depth, int maxDepth, int maxNodes, ref int count)
         {
             if (t == null || count >= maxNodes || depth > maxDepth) return;
