@@ -32,7 +32,8 @@ namespace SMTQualityOfLife
         private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpSkills;
         private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpNpcManager;
         private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpButtonsBar;
-            
+        private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpProductListing;
+
         private void Awake()
         {
             // KEYBOARD SHORTCUTS START-UP
@@ -54,7 +55,10 @@ namespace SMTQualityOfLife
             _keyboardShortcutDumpButtonsBar = Config.Bind("General",
                 "KeyboardShortcutDumpButtonsBar", new KeyboardShortcut(KeyCode.F11, new[] { KeyCode.LeftControl }),
                 (ConfigDescription.Empty));
-            
+            _keyboardShortcutDumpProductListing = Config.Bind("General",
+                "KeyboardShortcutDumpProductListing", new KeyboardShortcut(KeyCode.F12, new[] { KeyCode.LeftControl }),
+                (ConfigDescription.Empty));
+
             _mainManager = new MainManager(Config, Logger);
             _lowCountProducts = new LowCountProducts(Config, _mainManager, new GUIUtilities());
             _npcAdder = new NPCAdder(Config, Logger, _mainManager, new GUIUtilities());
@@ -168,6 +172,18 @@ namespace SMTQualityOfLife
                 catch (System.Exception ex)
                 {
                     Logger.LogError($"Buttons_Bar debug failed: {ex}");
+                }
+            }
+
+            if (_keyboardShortcutDumpProductListing.Value.IsDown())
+            {
+                try
+                {
+                    DebugBlackboard.DumpProductListing();
+                }
+                catch (System.Exception ex)
+                {
+                    Logger.LogError($"ProductListing debug failed: {ex}");
                 }
             }
         }
