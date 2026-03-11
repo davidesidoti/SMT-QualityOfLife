@@ -16,15 +16,23 @@ namespace SMTQualityOfLife
         public ConfigEntry<bool> IsMainWindowEnabled;
         public ConfigEntry<bool> IsLowCountProductsWindowEnabled;
         public ConfigEntry<bool> IsNpcAdderWindowEnabled;
+        public ConfigEntry<bool> IsSmartPricesWindowEnabled;
         
         // === REFERENCES STUFF
         private MainManager _mainManager;
         private LowCountProducts _lowCountProducts;
         private NPCAdder _npcAdder;
+        private SmartPrices _smartPrices;
         
         // === PLUGIN STUFF
         private static readonly Harmony Harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
         
+        // === CAMERA LOCK
+        private bool _anyWindowOpen;
+        private Quaternion _savedCamLocalRot;
+        private Quaternion _savedCamParentLocalRot;
+        private bool _hasSavedCamState;
+
         // === KEYBOARD SHORTCUTS
         private static ConfigEntry<KeyboardShortcut> _keyboardShortcutEnableMainWindow;
         private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpBlackboard;
@@ -33,6 +41,7 @@ namespace SMTQualityOfLife
         private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpNpcManager;
         private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpButtonsBar;
         private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpProductListing;
+        private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpPricing;
 
         private void Awake()
         {
@@ -58,10 +67,14 @@ namespace SMTQualityOfLife
             _keyboardShortcutDumpProductListing = Config.Bind("General",
                 "KeyboardShortcutDumpProductListing", new KeyboardShortcut(KeyCode.F12, new[] { KeyCode.LeftControl }),
                 (ConfigDescription.Empty));
+            _keyboardShortcutDumpPricing = Config.Bind("General",
+                "KeyboardShortcutDumpPricing", new KeyboardShortcut(KeyCode.F6, new[] { KeyCode.LeftControl }),
+                (ConfigDescription.Empty));
 
             _mainManager = new MainManager(Config, Logger);
             _lowCountProducts = new LowCountProducts(Config, _mainManager, new GUIUtilities());
             _npcAdder = new NPCAdder(Config, Logger, _mainManager, new GUIUtilities());
+            _smartPrices = new SmartPrices(Config, Logger, _mainManager, new GUIUtilities());
             
             IsMainWindowEnabled = Config.Bind(
                 "SMTQualityOfLife",
@@ -80,12 +93,19 @@ namespace SMTQualityOfLife
                 "NPC Adder",
                 false,
                 "Enable or disable the display of the NPCAdder mod window.");
+
+            IsSmartPricesWindowEnabled = Config.Bind(
+                "SMTQualityOfLife",
+                "Smart Prices",
+                false,
+                "Enable or disable the display of the SmartPrices mod window.");
             
             Instance = this;
 
             IsMainWindowEnabled.SettingChanged += OnMainWindowEnableChanged;
             IsLowCountProductsWindowEnabled.SettingChanged += OnLowCountProductWindowEnableChanged;
             IsNpcAdderWindowEnabled.SettingChanged += OnNpcAdderWindowEnableChanged;
+            IsSmartPricesWindowEnabled.SettingChanged += OnSmartPricesWindowEnableChanged;
             
             Harmony.PatchAll();
             
@@ -97,11 +117,12 @@ namespace SMTQualityOfLife
         {
             if (_keyboardShortcutEnableMainWindow.Value.IsDown())
             {
-                if (IsMainWindowEnabled.Value || IsLowCountProductsWindowEnabled.Value || IsNpcAdderWindowEnabled.Value)
+                if (IsMainWindowEnabled.Value || IsLowCountProductsWindowEnabled.Value || IsNpcAdderWindowEnabled.Value || IsSmartPricesWindowEnabled.Value)
                 {
                     IsMainWindowEnabled.Value = false;
                     IsLowCountProductsWindowEnabled.Value = false;
                     IsNpcAdderWindowEnabled.Value = false;
+                    IsSmartPricesWindowEnabled.Value = false;
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
                 }
@@ -110,6 +131,7 @@ namespace SMTQualityOfLife
                     IsMainWindowEnabled.Value = true;
                     IsLowCountProductsWindowEnabled.Value = false;
                     IsNpcAdderWindowEnabled.Value = false;
+                    IsSmartPricesWindowEnabled.Value = false;
                     Cursor.lockState = CursorLockMode.None;
                     Cursor.visible = true;
                 }
@@ -186,6 +208,57 @@ namespace SMTQualityOfLife
                     Logger.LogError($"ProductListing debug failed: {ex}");
                 }
             }
+
+            if (_keyboardShortcutDumpPricing.Value.IsDown())
+            {
+                try
+                {
+                    DebugBlackboard.DumpPricingClasses();
+                }
+                catch (System.Exception ex)
+                {
+                    Logger.LogError($"Pricing discovery dump failed: {ex}");
+                }
+            }
+
+            // Track whether any mod window is open and manage camera freeze
+            _anyWindowOpen = IsMainWindowEnabled.Value || IsLowCountProductsWindowEnabled.Value ||
+                             IsNpcAdderWindowEnabled.Value || IsSmartPricesWindowEnabled.Value;
+
+            if (_anyWindowOpen)
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+
+                // Save camera state the first frame the GUI opens
+                if (!_hasSavedCamState)
+                {
+                    var cam = Camera.main;
+                    if (cam != null)
+                    {
+                        _savedCamLocalRot = cam.transform.localRotation;
+                        if (cam.transform.parent != null)
+                            _savedCamParentLocalRot = cam.transform.parent.localRotation;
+                        _hasSavedCamState = true;
+                    }
+                }
+            }
+            else
+            {
+                _hasSavedCamState = false;
+            }
+        }
+
+        private void LateUpdate()
+        {
+            if (!_anyWindowOpen || !_hasSavedCamState) return;
+
+            var cam = Camera.main;
+            if (cam == null) return;
+
+            cam.transform.localRotation = _savedCamLocalRot;
+            if (cam.transform.parent != null)
+                cam.transform.parent.localRotation = _savedCamParentLocalRot;
         }
 
         private void OnMainWindowEnableChanged(object sender, System.EventArgs e)
@@ -203,6 +276,11 @@ namespace SMTQualityOfLife
             _npcAdder.SetWindowVisibility(IsNpcAdderWindowEnabled.Value);
         }
 
+        private void OnSmartPricesWindowEnableChanged(object sender, System.EventArgs e)
+        {
+            _smartPrices.SetWindowVisibility(IsSmartPricesWindowEnabled.Value);
+        }
+
         private void OnGUI()
         {
             if (IsMainWindowEnabled.Value)
@@ -218,6 +296,11 @@ namespace SMTQualityOfLife
             if (IsNpcAdderWindowEnabled.Value)
             {
                 _npcAdder.DrawWindow();
+            }
+
+            if (IsSmartPricesWindowEnabled.Value)
+            {
+                _smartPrices.DrawWindow();
             }
         }
     }

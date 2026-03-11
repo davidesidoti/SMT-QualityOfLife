@@ -21,7 +21,7 @@ namespace SMTQualityOfLife
         private readonly ConfigEntry<bool> _twentyCentsModEnabled;
         public readonly ConfigEntry<bool> NpcAdderEnabled;
         public readonly ConfigEntry<bool> LowProductCountEnabled;
-        private readonly ConfigEntry<bool> _smartPricesEnabled;
+        public readonly ConfigEntry<bool> SmartPricesEnabled;
         
         // === OTHER STUFF
         private readonly ManualLogSource _logger;
@@ -47,7 +47,7 @@ namespace SMTQualityOfLife
                 false,
                 "LowCountProducts Mod enabled");
             
-            _smartPricesEnabled = config.Bind(
+            SmartPricesEnabled = config.Bind(
                 "SmartPricesMod",
                 "SmartPrices Mod",
                 false,
@@ -56,7 +56,7 @@ namespace SMTQualityOfLife
             _tempTwentyCentsToggle = _twentyCentsModEnabled.Value;
             _tempNpcAdderToggle = NpcAdderEnabled.Value;
             _tempLowProductCountToggle = LowProductCountEnabled.Value;
-            _tempSmartPricesToggle = _smartPricesEnabled.Value;
+            _tempSmartPricesToggle = SmartPricesEnabled.Value;
         }
         
         public void SetWindowVisibility(bool visible)
@@ -95,23 +95,24 @@ namespace SMTQualityOfLife
             //     ref _tempTwentyCentsToggle,
             //     null);
             
-            _guiUtilities.DrawModSection(
-                "NPCAdder Mod",
-                "This mod allows you to add up to 15 NPC's employees to your store once you unlock all of the possible upgrades.",
-                ref _tempNpcAdderToggle,
-                OpenNpcAdderSettings);
-            
+            // NPCAdder Mod hidden — not implemented yet
+            // _guiUtilities.DrawModSection(
+            //     "NPCAdder Mod",
+            //     "This mod allows you to add up to 15 NPC's employees to your store once you unlock all of the possible upgrades.",
+            //     ref _tempNpcAdderToggle,
+            //     OpenNpcAdderSettings);
+
             _guiUtilities.DrawModSection(
                 "LowCountProducts Mod",
                 "This mod allows you to add all your low count products to the shopping cart at the manager blackboard by simply clicking a button.",
                 ref _tempLowProductCountToggle,
                 OpenLowCountProductsSettings);
             
-            // _guiUtilities.DrawModSection(
-            //     "SmartPrices Mod",
-            //     "This mod allows you to maximize your income by modifying the price set by the pricing machine to the highest price possible.",
-            //     ref _tempSmartPricesToggle,
-            //     OpenSmartPricesSettings);
+            _guiUtilities.DrawModSection(
+                "SmartPrices Mod",
+                "This mod allows you to maximize your income by modifying the price set by the pricing machine to the highest price possible.",
+                ref _tempSmartPricesToggle,
+                OpenSmartPricesSettings);
 
             GUILayout.EndScrollView();
             
@@ -135,9 +136,10 @@ namespace SMTQualityOfLife
                 _logger.LogInfo($"Low Count Product Enabled: {_tempLowProductCountToggle}");
             }
 
-            if (_smartPricesEnabled.Value != _tempSmartPricesToggle)
+            if (SmartPricesEnabled.Value != _tempSmartPricesToggle)
             {
-                _smartPricesEnabled.Value = _tempSmartPricesToggle;
+                SmartPricesEnabled.Value = _tempSmartPricesToggle;
+                SmartPrices.SmartPricesState = SmartPricesEnabled.Value;
                 _logger.LogInfo($"Smart Prices Enabled: {_tempSmartPricesToggle}");
             }
         }
@@ -158,7 +160,8 @@ namespace SMTQualityOfLife
 
         private void OpenSmartPricesSettings()
         {
-            _logger.LogInfo("Opening smart prices settings");
+            Plugin.Instance.IsMainWindowEnabled.Value = false;
+            Plugin.Instance.IsSmartPricesWindowEnabled.Value = true;
         }
     }
 }
