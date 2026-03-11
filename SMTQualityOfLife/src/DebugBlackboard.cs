@@ -607,6 +607,136 @@ namespace SMTQualityOfLife
             EmitDump(sb);
         }
 
+        public static void DumpPricingClasses()
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("[SMT QoL] ===== Pricing Classes Discovery Dump =====");
+            sb.AppendLine($"Time: {DateTime.Now:O}");
+
+            // Phase 1: Scan Assembly-CSharp for pricing-related types
+            Assembly gameAssembly = typeof(ManagerBlackboard).Assembly;
+            string[] keywords = { "price", "label", "gun", "tag", "margin", "cost",
+                                  "markup", "inflation", "profit" };
+
+            var matchingTypes = gameAssembly.GetTypes()
+                .Where(t =>
+                {
+                    string n = t.Name.ToLowerInvariant();
+                    return keywords.Any(k => n.Contains(k));
+                })
+                .OrderBy(t => t.Name)
+                .ToArray();
+
+            sb.AppendLine($"Matching types in {gameAssembly.GetName().Name}: {matchingTypes.Length}");
+            sb.AppendLine();
+
+            foreach (var type in matchingTypes)
+            {
+                sb.AppendLine($"=== TYPE: {type.FullName} ===");
+                sb.AppendLine($"  BaseType: {type.BaseType?.FullName}");
+                sb.AppendLine($"  IsClass: {type.IsClass}, IsEnum: {type.IsEnum}, IsValueType: {type.IsValueType}");
+
+                // Fields
+                var fields = type.GetFields(BindingFlags.Instance | BindingFlags.Static |
+                                             BindingFlags.Public | BindingFlags.NonPublic);
+                if (fields.Length > 0)
+                {
+                    sb.AppendLine($"  FIELDS ({fields.Length}):");
+                    foreach (var f in fields)
+                    {
+                        string mod = f.IsStatic ? "static " : "";
+                        string access = f.IsPublic ? "public" : "private";
+                        sb.AppendLine($"    {access} {mod}{f.FieldType.Name} {f.Name}");
+                    }
+                }
+
+                // Properties
+                var props = type.GetProperties(BindingFlags.Instance | BindingFlags.Static |
+                                                BindingFlags.Public | BindingFlags.NonPublic);
+                if (props.Length > 0)
+                {
+                    sb.AppendLine($"  PROPERTIES ({props.Length}):");
+                    foreach (var p in props)
+                    {
+                        sb.AppendLine($"    {p.PropertyType.Name} {p.Name} [get={p.CanRead}, set={p.CanWrite}]");
+                    }
+                }
+
+                // Methods (declared only)
+                var methods = type.GetMethods(BindingFlags.Instance | BindingFlags.Static |
+                                               BindingFlags.Public | BindingFlags.NonPublic |
+                                               BindingFlags.DeclaredOnly);
+                if (methods.Length > 0)
+                {
+                    sb.AppendLine($"  METHODS ({methods.Length}):");
+                    foreach (var m in methods)
+                    {
+                        string mod = m.IsStatic ? "static " : "";
+                        string parms = string.Join(", ",
+                            m.GetParameters().Select(p => $"{p.ParameterType.Name} {p.Name}"));
+                        sb.AppendLine($"    {mod}{m.ReturnType.Name} {m.Name}({parms})");
+                    }
+                }
+
+                sb.AppendLine();
+            }
+
+            // Phase 2: Scan active scene GameObjects for live instances of matching types
+            sb.AppendLine("=== ACTIVE SCENE INSTANCES ===");
+            var allBehaviours = Object.FindObjectsOfType<MonoBehaviour>(true);
+            foreach (var type in matchingTypes)
+            {
+                if (!typeof(MonoBehaviour).IsAssignableFrom(type)) continue;
+                var instances = allBehaviours.Where(b => b != null && b.GetType() == type).ToArray();
+                if (instances.Length == 0) continue;
+
+                sb.AppendLine($"Found {instances.Length} instance(s) of {type.Name}:");
+                foreach (var inst in instances.Take(5))
+                {
+                    sb.AppendLine($"  GameObject: {GetFullPath(inst.transform)}");
+                    // Dump field values for the first instance to see runtime state
+                    if (inst == instances[0])
+                    {
+                        var instFields = type.GetFields(BindingFlags.Instance | BindingFlags.Public |
+                                                         BindingFlags.NonPublic);
+                        foreach (var f in instFields.Take(30))
+                        {
+                            var val = SafeGet(() => f.GetValue(inst));
+                            string valStr = SummarizeValue(f.FieldType, val);
+                            sb.AppendLine($"    {f.Name} = {valStr}");
+                        }
+                    }
+                }
+            }
+
+            // Phase 3: Scan ALL types for methods containing "price" in the method name
+            sb.AppendLine();
+            sb.AppendLine("=== METHODS CONTAINING 'price' IN ANY TYPE (first 50) ===");
+            int methodCount = 0;
+            foreach (var type in gameAssembly.GetTypes())
+            {
+                if (methodCount >= 50) break;
+                try
+                {
+                    var priceMethods = type.GetMethods(BindingFlags.Instance | BindingFlags.Static |
+                                                        BindingFlags.Public | BindingFlags.NonPublic |
+                                                        BindingFlags.DeclaredOnly)
+                        .Where(m => m.Name.IndexOf("price", StringComparison.OrdinalIgnoreCase) >= 0);
+                    foreach (var m in priceMethods)
+                    {
+                        if (methodCount >= 50) break;
+                        string parms = string.Join(", ",
+                            m.GetParameters().Select(p => $"{p.ParameterType.Name} {p.Name}"));
+                        sb.AppendLine($"  {type.Name}.{m.Name}({parms}) -> {m.ReturnType.Name}");
+                        methodCount++;
+                    }
+                }
+                catch { /* skip types that throw on reflection */ }
+            }
+
+            EmitDump(sb);
+        }
+
         private static string SummarizeValue(Type type, object val)
         {
             if (val == null) return "<null>";
