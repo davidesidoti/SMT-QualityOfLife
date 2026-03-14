@@ -15,14 +15,14 @@ namespace SMTQualityOfLife
         // === CONFIG STUFF
         public ConfigEntry<bool> IsMainWindowEnabled;
         public ConfigEntry<bool> IsLowCountProductsWindowEnabled;
-        public ConfigEntry<bool> IsNpcAdderWindowEnabled;
         public ConfigEntry<bool> IsSmartPricesWindowEnabled;
+        public ConfigEntry<bool> IsCheckoutVolumeWindowEnabled;
         
         // === REFERENCES STUFF
         private MainManager _mainManager;
         private LowCountProducts _lowCountProducts;
-        private NPCAdder _npcAdder;
         private SmartPrices _smartPrices;
+        private CheckoutVolume _checkoutVolume;
         
         // === PLUGIN STUFF
         private static readonly Harmony Harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
@@ -73,8 +73,8 @@ namespace SMTQualityOfLife
 
             _mainManager = new MainManager(Config, Logger);
             _lowCountProducts = new LowCountProducts(Config, _mainManager, new GUIUtilities());
-            _npcAdder = new NPCAdder(Config, Logger, _mainManager, new GUIUtilities());
             _smartPrices = new SmartPrices(Config, Logger, _mainManager, new GUIUtilities());
+            _checkoutVolume = new CheckoutVolume(Config, Logger, _mainManager, new GUIUtilities());
             
             IsMainWindowEnabled = Config.Bind(
                 "SMTQualityOfLife",
@@ -88,24 +88,24 @@ namespace SMTQualityOfLife
                 false,
                 "Enable or disable the display of the LowCountProducts mod window.");
             
-            IsNpcAdderWindowEnabled = Config.Bind(
-                "SMTQualityOfLife",
-                "NPC Adder",
-                false,
-                "Enable or disable the display of the NPCAdder mod window.");
-
             IsSmartPricesWindowEnabled = Config.Bind(
                 "SMTQualityOfLife",
                 "Smart Prices",
                 false,
                 "Enable or disable the display of the SmartPrices mod window.");
+
+            IsCheckoutVolumeWindowEnabled = Config.Bind(
+                "SMTQualityOfLife",
+                "Checkout Volume",
+                false,
+                "Enable or disable the display of the CheckoutVolume mod window.");
             
             Instance = this;
 
             IsMainWindowEnabled.SettingChanged += OnMainWindowEnableChanged;
             IsLowCountProductsWindowEnabled.SettingChanged += OnLowCountProductWindowEnableChanged;
-            IsNpcAdderWindowEnabled.SettingChanged += OnNpcAdderWindowEnableChanged;
             IsSmartPricesWindowEnabled.SettingChanged += OnSmartPricesWindowEnableChanged;
+            IsCheckoutVolumeWindowEnabled.SettingChanged += OnCheckoutVolumeWindowEnableChanged;
             
             Harmony.PatchAll();
             
@@ -117,12 +117,12 @@ namespace SMTQualityOfLife
         {
             if (_keyboardShortcutEnableMainWindow.Value.IsDown())
             {
-                if (IsMainWindowEnabled.Value || IsLowCountProductsWindowEnabled.Value || IsNpcAdderWindowEnabled.Value || IsSmartPricesWindowEnabled.Value)
+                if (IsMainWindowEnabled.Value || IsLowCountProductsWindowEnabled.Value || IsSmartPricesWindowEnabled.Value || IsCheckoutVolumeWindowEnabled.Value)
                 {
                     IsMainWindowEnabled.Value = false;
                     IsLowCountProductsWindowEnabled.Value = false;
-                    IsNpcAdderWindowEnabled.Value = false;
                     IsSmartPricesWindowEnabled.Value = false;
+                    IsCheckoutVolumeWindowEnabled.Value = false;
                     Cursor.lockState = CursorLockMode.Locked;
                     Cursor.visible = false;
                 }
@@ -130,8 +130,8 @@ namespace SMTQualityOfLife
                 {
                     IsMainWindowEnabled.Value = true;
                     IsLowCountProductsWindowEnabled.Value = false;
-                    IsNpcAdderWindowEnabled.Value = false;
                     IsSmartPricesWindowEnabled.Value = false;
+                    IsCheckoutVolumeWindowEnabled.Value = false;
                     Cursor.lockState = CursorLockMode.None;
                     Cursor.visible = true;
                 }
@@ -223,7 +223,8 @@ namespace SMTQualityOfLife
 
             // Track whether any mod window is open and manage camera freeze
             _anyWindowOpen = IsMainWindowEnabled.Value || IsLowCountProductsWindowEnabled.Value ||
-                             IsNpcAdderWindowEnabled.Value || IsSmartPricesWindowEnabled.Value;
+                             IsSmartPricesWindowEnabled.Value ||
+                             IsCheckoutVolumeWindowEnabled.Value;
 
             if (_anyWindowOpen)
             {
@@ -271,14 +272,14 @@ namespace SMTQualityOfLife
             _lowCountProducts.SetWindowVisibility(IsLowCountProductsWindowEnabled.Value);
         }
 
-        private void OnNpcAdderWindowEnableChanged(object sender, System.EventArgs e)
-        {
-            _npcAdder.SetWindowVisibility(IsNpcAdderWindowEnabled.Value);
-        }
-
         private void OnSmartPricesWindowEnableChanged(object sender, System.EventArgs e)
         {
             _smartPrices.SetWindowVisibility(IsSmartPricesWindowEnabled.Value);
+        }
+
+        private void OnCheckoutVolumeWindowEnableChanged(object sender, System.EventArgs e)
+        {
+            _checkoutVolume.SetWindowVisibility(IsCheckoutVolumeWindowEnabled.Value);
         }
 
         private void OnGUI()
@@ -293,14 +294,14 @@ namespace SMTQualityOfLife
                 _lowCountProducts.DrawWindow();
             }
 
-            if (IsNpcAdderWindowEnabled.Value)
-            {
-                _npcAdder.DrawWindow();
-            }
-
             if (IsSmartPricesWindowEnabled.Value)
             {
                 _smartPrices.DrawWindow();
+            }
+
+            if (IsCheckoutVolumeWindowEnabled.Value)
+            {
+                _checkoutVolume.DrawWindow();
             }
         }
     }
