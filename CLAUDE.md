@@ -18,7 +18,7 @@ dotnet build SMTQualityOfLife -c Release
 
 Output: `SMTQualityOfLife/bin/<Config>/netstandard2.1/SMTQualityOfLife.dll`
 
-**Deploy for testing:** Copy the DLL to `<Game>/BepInEx/plugins/SMTQualityOfLife/` then launch the game.
+**Deploy for testing:** Copy the DLL to `<Game>/BepInEx/plugins/SMTQualityOfLife.dll` then launch the game.
 
 There are no automated tests — validation is manual in-game (`Ctrl+H` to open mod UI).
 
@@ -35,18 +35,19 @@ Each feature is a self-contained class with three responsibilities:
 
 | File | Module | Status |
 |------|--------|--------|
-| `NPCAdder.cs` | Raises the in-game NPC employee cap beyond 10 (up to 15) | Active |
 | `LowCountProducts.cs` | Injects an "Add Low Count Products" button into the manager blackboard UI | Active |
+| `SmartPrices.cs` | Auto-sets pricing gun to configurable markup over market price | Active |
+| `CheckoutVolume.cs` | Controls scanner beep volume at checkout registers via slider | Active |
 | `MainManager.cs` | Main mod selection window; routes to sub-windows | Active |
-| `NpcUpgradeGating.cs` | Checks via reflection whether all Extra Employee upgrades are purchased | Helper |
 | `GUIUtilities.cs` | Shared IMGUI helper methods (styles, section drawers) | Shared |
-| `DebugBlackboard.cs` | Debug dump utilities triggered by `Ctrl+F7–F11` | Debug |
+| `DebugBlackboard.cs` | Debug dump utilities triggered by `Ctrl+F6–F12` | Debug |
 
 ### GUI Flow
 - `Ctrl+H` toggles `Plugin.IsMainWindowEnabled`
 - `MainManager` window shows module toggles; "Mod Settings" buttons switch to sub-windows
 - Each sub-window has a `< Back` button returning to `MainManager`
-- Windows use unique integer IDs: `0` = MainManager, `1` = NPCAdder / LowCountProducts
+- Windows use unique integer IDs: `0` = MainManager, `1` = LowCountProducts, `2` = SmartPrices, `3` = CheckoutVolume
+- Camera rotation is frozen via `LateUpdate` save/restore while any window is open
 
 ### Harmony Patch Pattern
 Patches live in a nested namespace at the bottom of each feature file:
@@ -76,3 +77,12 @@ All settings persist in `BepInEx/config/SMTQualityOfLife.cfg`. Use `ConfigEntry<
 
 ## Versioning
 Bump `<Version>` in `SMTQualityOfLife/SMTQualityOfLife.csproj` for any user-visible change. Use short imperative commit messages (e.g., `Add NPCAdder threshold check`).
+
+## Git Workflow
+- Branch: `dev` for development, PR to `main` for releases. Never delete `dev` after merge.
+- Use `gh pr create --base main --head dev` then `gh pr merge <N> --merge` to merge.
+- Create releases on `main`: `gh release create v<X.Y.Z> --target main`
+
+## Decompiling External Mods
+- Use `ilspycmd` (install: `dotnet tool install -g ilspycmd`) to decompile .dll files
+- PowerShell reflection (`Assembly.Load`) fails for game DLLs due to missing dependencies

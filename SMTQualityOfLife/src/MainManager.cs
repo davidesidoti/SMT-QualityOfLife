@@ -13,15 +13,15 @@ namespace SMTQualityOfLife
         private Vector2 _scrollPosition;
 
         private bool _tempTwentyCentsToggle;
-        private bool _tempNpcAdderToggle;
         private bool _tempLowProductCountToggle;
         private bool _tempSmartPricesToggle;
+        private bool _tempCheckoutVolumeToggle;
         
         // === CONFIG STUFF
         private readonly ConfigEntry<bool> _twentyCentsModEnabled;
-        public readonly ConfigEntry<bool> NpcAdderEnabled;
         public readonly ConfigEntry<bool> LowProductCountEnabled;
         public readonly ConfigEntry<bool> SmartPricesEnabled;
+        public readonly ConfigEntry<bool> CheckoutVolumeEnabled;
         
         // === OTHER STUFF
         private readonly ManualLogSource _logger;
@@ -35,12 +35,6 @@ namespace SMTQualityOfLife
                 false,
                 "TwentyCents Mod enabled");
             
-            NpcAdderEnabled = config.Bind(
-                "NPCAdderMod",
-                "NPCAdder",
-                false,
-                "NPC Adder enabled");
-            
             LowProductCountEnabled = config.Bind(
                 "LowCountProductsMod",
                 "LowCountProducts Mod",
@@ -52,11 +46,17 @@ namespace SMTQualityOfLife
                 "SmartPrices Mod",
                 false,
                 "SmartPrices Mod enabled");
-            
+
+            CheckoutVolumeEnabled = config.Bind(
+                "CheckoutVolumeMod",
+                "CheckoutVolume Mod",
+                false,
+                "Checkout Volume Mod enabled");
+
             _tempTwentyCentsToggle = _twentyCentsModEnabled.Value;
-            _tempNpcAdderToggle = NpcAdderEnabled.Value;
             _tempLowProductCountToggle = LowProductCountEnabled.Value;
             _tempSmartPricesToggle = SmartPricesEnabled.Value;
+            _tempCheckoutVolumeToggle = CheckoutVolumeEnabled.Value;
         }
         
         public void SetWindowVisibility(bool visible)
@@ -95,13 +95,6 @@ namespace SMTQualityOfLife
             //     ref _tempTwentyCentsToggle,
             //     null);
             
-            // NPCAdder Mod hidden — not implemented yet
-            // _guiUtilities.DrawModSection(
-            //     "NPCAdder Mod",
-            //     "This mod allows you to add up to 15 NPC's employees to your store once you unlock all of the possible upgrades.",
-            //     ref _tempNpcAdderToggle,
-            //     OpenNpcAdderSettings);
-
             _guiUtilities.DrawModSection(
                 "LowCountProducts Mod",
                 "This mod allows you to add all your low count products to the shopping cart at the manager blackboard by simply clicking a button.",
@@ -114,6 +107,12 @@ namespace SMTQualityOfLife
                 ref _tempSmartPricesToggle,
                 OpenSmartPricesSettings);
 
+            _guiUtilities.DrawModSection(
+                "Checkout Volume",
+                "Control the volume of the scanner beep sound at checkout registers (regular and self-checkout).",
+                ref _tempCheckoutVolumeToggle,
+                OpenCheckoutVolumeSettings);
+
             GUILayout.EndScrollView();
             
             // Update the config value based on the toggle state
@@ -123,12 +122,6 @@ namespace SMTQualityOfLife
                 _logger.LogInfo($"TwentyCents Mod enabled: {_tempTwentyCentsToggle}");
             }
             
-            if (NpcAdderEnabled.Value != _tempNpcAdderToggle)
-            {
-                NpcAdderEnabled.Value = _tempNpcAdderToggle;
-                _logger.LogInfo($"NPCAdder Mod enabled: {_tempNpcAdderToggle}");
-            }
-
             if (LowProductCountEnabled.Value != _tempLowProductCountToggle)
             {
                 LowProductCountEnabled.Value = _tempLowProductCountToggle;
@@ -142,15 +135,15 @@ namespace SMTQualityOfLife
                 SmartPrices.SmartPricesState = SmartPricesEnabled.Value;
                 _logger.LogInfo($"Smart Prices Enabled: {_tempSmartPricesToggle}");
             }
+
+            if (CheckoutVolumeEnabled.Value != _tempCheckoutVolumeToggle)
+            {
+                CheckoutVolumeEnabled.Value = _tempCheckoutVolumeToggle;
+                CheckoutVolume.CheckoutVolumeState = CheckoutVolumeEnabled.Value;
+                _logger.LogInfo($"Checkout Volume Enabled: {_tempCheckoutVolumeToggle}");
+            }
         }
         
-        private void OpenNpcAdderSettings()
-        {
-            // _logger.LogInfo("Opening npc adder settings");
-            Plugin.Instance.IsMainWindowEnabled.Value = false;
-            Plugin.Instance.IsNpcAdderWindowEnabled.Value = true;
-        }
-
         private void OpenLowCountProductsSettings()
         {
             // _logger.LogInfo("Opening low count products settings");
@@ -162,6 +155,12 @@ namespace SMTQualityOfLife
         {
             Plugin.Instance.IsMainWindowEnabled.Value = false;
             Plugin.Instance.IsSmartPricesWindowEnabled.Value = true;
+        }
+
+        private void OpenCheckoutVolumeSettings()
+        {
+            Plugin.Instance.IsMainWindowEnabled.Value = false;
+            Plugin.Instance.IsCheckoutVolumeWindowEnabled.Value = true;
         }
     }
 }

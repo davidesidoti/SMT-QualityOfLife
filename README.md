@@ -9,19 +9,22 @@ A BepInEx mod for the Unity game **Supermarket Together** that enhances your gam
 
 ## Features
 
-### NPCAdder Mod
+### LowCountProducts Mod
 
-- **Extend NPC Limit**: Increase the maximum number of NPC employees in your store beyond the default limit, up to 15 NPCs.
-- **Dynamic Management**: Add or remove NPC employees through an in-game interface.
-- **Unlock Requirement**: Feature becomes available once all NPC-related upgrades are purchased in-game.
+- **Quick Restock**: Adds an "Add Low Count Products" button to the manager's blackboard that automatically adds all low-stock products to your shopping cart.
+- **Configurable Threshold**: Set the minimum stock level that triggers a product to be considered "low count".
 
-*Note: Currently, only the NPCAdder Mod is enabled. Other features are coming soon.*
+### SmartPrices Mod
 
-### Upcoming Features
+- **Automatic Pricing**: When using the pricing gun, the price is automatically set to the optimal value based on a configurable markup percentage.
+- **Formula**: `base price x tier inflation x (1 + markup / 100)`
+- **Adjustable Markup**: Fine-tune your markup percentage through the in-game settings with +/- buttons.
 
-- **LowCountProducts Mod**: Quickly restock low-count products by adding them to the shopping cart directly from the manager's blackboard.
-- **TwentyCents Mod**: Replace the 25-cent coin at checkout with a 20-cent coin for smoother transactions.
-- **SmartPrices Mod**: Automatically adjust product prices to the highest possible value to maximize income.
+### Checkout Volume
+
+- **Scanner Beep Control**: Adjust the volume of the beep sound when products are scanned at checkout registers.
+- **Works Everywhere**: Applies to both regular checkouts and self-checkout stations.
+- **Slider + Presets**: Use a smooth slider or quick preset buttons (Mute, 25%, 50%, 75%, 100%).
 
 ## Installation
 
@@ -34,19 +37,13 @@ A BepInEx mod for the Unity game **Supermarket Together** that enhances your gam
 ## Usage
 
 - **Open Mod Menu**: Press `Ctrl + H` to toggle the main mod window.
-- **Enable NPCAdder Mod**:
-  - Open the main mod window.
-  - Find the **NPCAdder Mod** section.
-  - Check the box to enable the mod.
-  - Click on **Mod Settings** to configure.
-- **Adjust NPC Count**:
-  - In the NPCAdder settings, use the **+ Add** button to increase or the **- Remove** button to decrease the maximum number of NPCs.
-  - Changes will reflect in-game instantly.
+- **Enable Features**: Toggle each mod on/off from the main window.
+- **Configure Settings**: Click "Mod Settings" next to any enabled mod to access its configuration.
 
 ## Configuration
 
 - **Keyboard Shortcuts**: Modify key bindings in the `BepInEx/config/SMTQualityOfLife.cfg` file.
-- **Settings**: All settings are accessible in-game through the mod's GUI.
+- **Settings**: All settings are accessible in-game through the mod's GUI and persist across sessions.
 
 ## Contributing
 
