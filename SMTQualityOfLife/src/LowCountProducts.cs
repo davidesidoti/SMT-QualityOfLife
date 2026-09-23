@@ -11,6 +11,19 @@ using Object = UnityEngine.Object;
 
 namespace SMTQualityOfLife
 {
+    /// <summary>
+    /// Selects how the <c>Add Low Count Products</c> button behaves when clicked.
+    /// </summary>
+    public enum LowCountMode
+    {
+        /// <summary>Legacy behaviour: skip products that have stock in storage or unopened boxes, and skip products already in the cart.</summary>
+        Original = 0,
+        /// <summary>Skip the legacy exclusions; each click adds exactly 1 box per low-stock product.</summary>
+        OneBoxPerClick = 1,
+        /// <summary>Skip the legacy exclusions; each click adds enough boxes to bring total stock up to the threshold.</summary>
+        AutoFillToThreshold = 2,
+    }
+
     public class LowCountProducts
     {
         // === GUI STUFF
@@ -25,11 +38,14 @@ namespace SMTQualityOfLife
         
         // === CONFIG STUFF
         public static ConfigEntry<int> LowCountProductsThreshold;
-        
+        public static ConfigEntry<int> LowCountProductsHighThreshold;
+        public static ConfigEntry<bool> UseHighThreshold;
+        public static ConfigEntry<LowCountMode> Mode;
+
         // ==== Notification stuff
         public static bool Notify;
         public static string NotificationType;
-        
+
         // === CLASS REFERENCES
         private readonly MainManager _manager;
 
@@ -37,7 +53,53 @@ namespace SMTQualityOfLife
         {
             _guiUtilities = guiUtilities;
             _manager = manager;
-            LowCountProductsThreshold = config.Bind("General", "LowCountProducts Threshold", 10);
+            LowCountProductsThreshold = config.Bind(
+                "General",
+                "LowCountProducts Low Threshold",
+                20,
+                "The low-end threshold value used by 'Add Low Count Products'. " +
+                "Products whose total stock is below the active threshold will be restocked.");
+            LowCountProductsHighThreshold = config.Bind(
+                "General",
+                "LowCountProducts High Threshold",
+                60,
+                "The high-end threshold value used by 'Add Low Count Products'. " +
+                "Toggle between this and the low threshold with Ctrl+Y (or the in-window button).");
+            UseHighThreshold = config.Bind(
+                "General",
+                "LowCountProducts Use High Threshold",
+                false,
+                "When true, the high threshold is used by 'Add Low Count Products'. " +
+                "When false, the low threshold is used. Toggled by Ctrl+Y and the GUI button.");
+            Mode = config.Bind(
+                "General",
+                "LowCountProducts Mode",
+                LowCountMode.AutoFillToThreshold,
+                "How 'Add Low Count Products' decides which products to add and how many boxes to add:\n" +
+                "  Original           - Legacy behaviour: skip if product has stock in storage or unopened boxes, and skip if already in cart (adds 1 box per product).\n" +
+                "  One Box Per Click  - Skip the legacy exclusions; each click adds 1 box per low-stock product. Click again to add more boxes.\n" +
+                "  Auto-Fill          - Skip the legacy exclusions; each click adds enough boxes to bring total stock up to the threshold.");
+        }
+
+        /// <summary>
+        /// Threshold value currently active for 'Add Low Count Products'.
+        /// </summary>
+        public static int ActiveThreshold =>
+            UseHighThreshold.Value ? LowCountProductsHighThreshold.Value : LowCountProductsThreshold.Value;
+
+        /// <summary>
+        /// Name of the currently active threshold ("Low" or "High") for UI display.
+        /// </summary>
+        public static string ActiveThresholdName =>
+            UseHighThreshold.Value ? "High" : "Low";
+
+        /// <summary>
+        /// Flip between the low and high threshold. Returns the new state.
+        /// </summary>
+        public static bool ToggleActiveThreshold()
+        {
+            UseHighThreshold.Value = !UseHighThreshold.Value;
+            return UseHighThreshold.Value;
         }
         
         public void SetWindowVisibility(bool visible)
@@ -80,14 +142,81 @@ namespace SMTQualityOfLife
             {
                 // Start a scroll view in case content overflows
                 _scrollPosition = GUILayout.BeginScrollView(_scrollPosition, GUILayout.Width(630), GUILayout.Height(420));
-                
+
+                // === ACTIVE THRESHOLD (display + toggle)
+                GUILayout.Label("Active Threshold", _guiUtilities.HeaderStyle);
+                GUILayout.Space(5);
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(
+                    $"Currently using: {ActiveThresholdName} = {ActiveThreshold}",
+                    _guiUtilities.LabelStyle);
+                if (GUILayout.Button(
+                        UseHighThreshold.Value ? "Switch to Low" : "Switch to High",
+                        GUILayout.Width(140)))
+                {
+                    ToggleActiveThresholdAndNotify();
+                }
+                GUILayout.EndHorizontal();
+                GUILayout.Label(
+                    "Tip: press Ctrl+Y in-game (or rebind 'LowCountProducts ToggleThresholdHotkey' in the config) " +
+                    "to flip between Low and High without opening this window.",
+                    _guiUtilities.DescriptionStyle);
+                GUILayout.Space(20);
+                _guiUtilities.DrawHorizontalLine();
+                GUILayout.Space(20);
+
+                // === LOW / HIGH THRESHOLD VALUES
                 _guiUtilities.DrawIntButtonAddSection(
-                    "Product Threshold",
-                    "Adjust the lowest possible product count value that will be added to the shopping cart.",
+                    "Low Threshold",
+                    "Threshold used when 'Use High Threshold' is OFF. " +
+                    "In 'Original' mode, only shelf count is compared. In 'One Box Per Click' and 'Auto-Fill' modes, " +
+                    "total stock (shelves + storage + unopened boxes) is compared.",
                     LowCountProductsThreshold.Value,
-                    OnAddThresholdButtonClicked,
-                    OnRemoveThresholdButtonClicked);
-                
+                    OnAddLowThresholdButtonClicked,
+                    OnRemoveLowThresholdButtonClicked);
+
+                _guiUtilities.DrawIntButtonAddSection(
+                    "High Threshold",
+                    "Threshold used when 'Use High Threshold' is ON. " +
+                    "Press Ctrl+Y (or click 'Switch to High' above) to activate.",
+                    LowCountProductsHighThreshold.Value,
+                    OnAddHighThresholdButtonClicked,
+                    OnRemoveHighThresholdButtonClicked);
+
+                // === ADD MODE
+                GUILayout.Label("Add Mode", _guiUtilities.HeaderStyle);
+                GUILayout.Space(5);
+                GUILayout.Label(
+                    "Choose how 'Add Low Count Products' decides which products to add and how many boxes.",
+                    _guiUtilities.DescriptionStyle);
+                GUILayout.Space(8);
+
+                string[] modeLabels =
+                {
+                    "Original",
+                    "One Box Per Click",
+                    "Auto-Fill",
+                };
+                LowCountMode[] modeValues =
+                {
+                    LowCountMode.Original,
+                    LowCountMode.OneBoxPerClick,
+                    LowCountMode.AutoFillToThreshold,
+                };
+                int currentIndex = (int)Mode.Value;
+                int newIndex = GUILayout.Toolbar(currentIndex, modeLabels);
+                if (newIndex != currentIndex && newIndex >= 0 && newIndex < modeValues.Length)
+                {
+                    Mode.Value = modeValues[newIndex];
+                }
+
+                GUILayout.Space(6);
+                GUILayout.Label(DescribeMode(Mode.Value), _guiUtilities.DescriptionStyle);
+
+                GUILayout.Space(20);
+                _guiUtilities.DrawHorizontalLine();
+                GUILayout.Space(20);
+
                 GUILayout.EndScrollView();
             }
             else
@@ -97,9 +226,56 @@ namespace SMTQualityOfLife
 
         }
 
-        private void OnAddThresholdButtonClicked()
+        private void OnAddLowThresholdButtonClicked()
         {
             LowCountProductsThreshold.Value++;
+        }
+
+        private void OnRemoveLowThresholdButtonClicked()
+        {
+            if (LowCountProductsThreshold.Value > 0)
+            {
+                LowCountProductsThreshold.Value--;
+            }
+        }
+
+        private void OnAddHighThresholdButtonClicked()
+        {
+            LowCountProductsHighThreshold.Value++;
+        }
+
+        private void OnRemoveHighThresholdButtonClicked()
+        {
+            if (LowCountProductsHighThreshold.Value > 0)
+            {
+                LowCountProductsHighThreshold.Value--;
+            }
+        }
+
+        private static void ToggleActiveThresholdAndNotify()
+        {
+            bool nowHigh = ToggleActiveThreshold();
+            NotificationType = "lowCountThresholdToggle";
+            Notify = true;
+            Debug.Log($"[SMT QoL] Threshold toggled: now using {(nowHigh ? "High" : "Low")} = {ActiveThreshold}");
+        }
+
+        private static string DescribeMode(LowCountMode mode)
+        {
+            switch (mode)
+            {
+                case LowCountMode.Original:
+                    return "Original — adds 1 box per product only when shelf count is below the threshold AND " +
+                           "no stock is sitting in storage or unopened boxes. Products already in the cart are skipped.";
+                case LowCountMode.OneBoxPerClick:
+                    return "One Box Per Click — adds 1 box per product whose total stock is below the threshold, " +
+                           "regardless of storage/boxes. Click again to add more boxes (the cart is not de-duplicated).";
+                case LowCountMode.AutoFillToThreshold:
+                    return "Auto-Fill — adds the number of boxes needed to bring total stock up to the threshold " +
+                           "in one click (rounded up). Ignores storage/boxes and is not de-duplicated against the cart.";
+                default:
+                    return string.Empty;
+            }
         }
 
         private void OnRemoveThresholdButtonClicked()
@@ -281,19 +457,53 @@ namespace SMTQualityOfLife.Patches
                         int storageQuantity = quantities[1];
                         int boxesQuantity = quantities[2];
 
-                        if (shelvesQuantity <= LowCountProducts.LowCountProductsThreshold.Value && storageQuantity == 0 && boxesQuantity == 0)
-                        {
-                            if (!lowProductList.ContainsKey(productID))
-                            {
-                                string price = GetProductPriceFromData(productsData, productListing.tierInflation, productID);
-                                Dictionary<string, object> productInfo = new Dictionary<string, object>
-                                {
-                                    { "ID", productID },
-                                    { "price", price }
-                                };
+                        int totalUnits = shelvesQuantity + storageQuantity + boxesQuantity;
+                        int threshold = LowCountProducts.ActiveThreshold;
+                        LowCountMode mode = LowCountProducts.Mode.Value;
 
-                                lowProductList[productID] = productInfo;
-                            }
+                        // Per-mode eligibility check
+                        bool eligible;
+                        switch (mode)
+                        {
+                            case LowCountMode.Original:
+                                // Legacy behaviour: shelf-only threshold, plus storage/boxes must be empty.
+                                eligible = shelvesQuantity <= threshold
+                                           && storageQuantity == 0
+                                           && boxesQuantity == 0;
+                                break;
+                            case LowCountMode.OneBoxPerClick:
+                            case LowCountMode.AutoFillToThreshold:
+                            default:
+                                // Compare against total stock so already-stocked products aren't re-ordered.
+                                eligible = totalUnits < threshold;
+                                break;
+                        }
+                        if (!eligible) continue;
+
+                        // Determine how many boxes to add (legacy mode is always 1)
+                        int boxesNeeded = 1;
+                        if (mode == LowCountMode.AutoFillToThreshold)
+                        {
+                            int maxItemsPerBox = GetMaxItemsPerBoxFromData(productsData, productID);
+                            if (maxItemsPerBox <= 0) maxItemsPerBox = 1; // safety fallback
+                            int unitsNeeded = threshold - totalUnits;
+                            boxesNeeded = (int)Math.Ceiling((double)unitsNeeded / maxItemsPerBox);
+                        }
+
+                        if (boxesNeeded <= 0) continue;
+
+                        if (!lowProductList.ContainsKey(productID))
+                        {
+                            string price = GetProductPriceFromData(productsData, productListing.tierInflation, productID);
+                            Dictionary<string, object> productInfo = new Dictionary<string, object>
+                            {
+                                { "ID", productID },
+                                { "price", price },
+                                { "boxesNeeded", boxesNeeded },
+                                { "mode", mode }
+                            };
+
+                            lowProductList[productID] = productInfo;
                         }
                     }
 
@@ -480,6 +690,48 @@ namespace SMTQualityOfLife.Patches
         private static FieldInfo _pdMaxItemsField;
         private static bool _pdFieldsResolved;
 
+        // Resolve ProductData fields via reflection on the first ProductData entry we encounter.
+        // Returns true if all three fields were found.
+        private static bool EnsureProductDataFieldsResolved(Array productsData)
+        {
+            if (_pdFieldsResolved)
+            {
+                return _pdBasePriceField != null && _pdProductTierField != null && _pdMaxItemsField != null;
+            }
+
+            // Find the first non-null entry to derive the element type
+            Type elemType = null;
+            for (int i = 0; i < productsData.Length; i++)
+            {
+                object entry = productsData.GetValue(i);
+                if (entry != null)
+                {
+                    elemType = entry.GetType();
+                    break;
+                }
+            }
+            if (elemType == null)
+            {
+                _pdFieldsResolved = true; // give up; do not retry
+                return false;
+            }
+
+            _pdBasePriceField = AccessTools.Field(elemType, "basePricePerUnit");
+            _pdProductTierField = AccessTools.Field(elemType, "productTier");
+            _pdMaxItemsField = AccessTools.Field(elemType, "maxItemsPerBox");
+            _pdFieldsResolved = true;
+
+            if (_pdBasePriceField == null || _pdProductTierField == null || _pdMaxItemsField == null)
+            {
+                Debug.LogError("[SMT QoL] ProductData fields not found: " +
+                    $"basePricePerUnit={_pdBasePriceField != null}, " +
+                    $"productTier={_pdProductTierField != null}, " +
+                    $"maxItemsPerBox={_pdMaxItemsField != null}");
+                return false;
+            }
+            return true;
+        }
+
         private static string GetProductPriceFromData(Array productsData, float[] tierInflation, int productID)
         {
             if (productID < 0 || productID >= productsData.Length)
@@ -488,25 +740,7 @@ namespace SMTQualityOfLife.Patches
             object entry = productsData.GetValue(productID);
             if (entry == null) return "$0.00";
 
-            // Resolve ProductData fields once via reflection
-            if (!_pdFieldsResolved)
-            {
-                var elemType = entry.GetType();
-                _pdBasePriceField = AccessTools.Field(elemType, "basePricePerUnit");
-                _pdProductTierField = AccessTools.Field(elemType, "productTier");
-                _pdMaxItemsField = AccessTools.Field(elemType, "maxItemsPerBox");
-                _pdFieldsResolved = true;
-
-                if (_pdBasePriceField == null || _pdProductTierField == null || _pdMaxItemsField == null)
-                {
-                    Debug.LogError("[SMT QoL] ProductData fields not found: " +
-                        $"basePricePerUnit={_pdBasePriceField != null}, " +
-                        $"productTier={_pdProductTierField != null}, " +
-                        $"maxItemsPerBox={_pdMaxItemsField != null}");
-                }
-            }
-
-            if (_pdBasePriceField == null || _pdProductTierField == null || _pdMaxItemsField == null)
+            if (!EnsureProductDataFieldsResolved(productsData))
                 return "$0.00";
 
             float basePricePerUnit = (float)_pdBasePriceField.GetValue(entry);
@@ -520,6 +754,27 @@ namespace SMTQualityOfLife.Patches
 
             return "$" + boxPrice.ToString("F2", CultureInfo.InvariantCulture);
         }
+
+        private static int GetMaxItemsPerBoxFromData(Array productsData, int productID)
+        {
+            if (productID < 0 || productID >= productsData.Length)
+                return 0;
+
+            object entry = productsData.GetValue(productID);
+            if (entry == null) return 0;
+
+            if (!EnsureProductDataFieldsResolved(productsData) || _pdMaxItemsField == null)
+                return 0;
+
+            try
+            {
+                return (int)_pdMaxItemsField.GetValue(entry);
+            }
+            catch
+            {
+                return 0;
+            }
+        }
         
         private static void AddProductsToCart(ManagerBlackboard manager, Dictionary<int, Dictionary<string, object>> lowProductList)
         {
@@ -527,34 +782,50 @@ namespace SMTQualityOfLife.Patches
             {
                 var productInfo = product.Value;
                 int productID = (int)productInfo["ID"];
-                
-                // Check if product is already in shopping list
-                if (IsProductInShoppingList(manager, productID))
+
+                int boxesNeeded = 1;
+                if (productInfo.TryGetValue("boxesNeeded", out object bnObj) && bnObj is int bn)
                 {
-                    // Skip adding this product
+                    boxesNeeded = bn;
+                }
+
+                LowCountMode mode = LowCountMode.OneBoxPerClick;
+                if (productInfo.TryGetValue("mode", out object modeObj) && modeObj is LowCountMode m)
+                {
+                    mode = m;
+                }
+
+                // In Original mode, skip products that are already in the shopping list.
+                if (mode == LowCountMode.Original && IsProductInShoppingList(manager, productID))
+                {
                     continue;
                 }
-                
+
                 string productPriceText = productInfo["price"].ToString().Replace("$", "").Replace(",", ".");
-                if (float.TryParse(productPriceText, NumberStyles.Float, CultureInfo.InvariantCulture, out float finalProductPrice))
+                if (!float.TryParse(productPriceText, NumberStyles.Float, CultureInfo.InvariantCulture, out float finalProductPrice))
+                    continue;
+
+                // Add the required number of boxes (AddShoppingListProduct adds one box per call).
+                // In OneBoxPerClick and AutoFill modes, this naturally increments the cart even if
+                // a previous click already added the product (matching the user's expectation).
+                for (int i = 0; i < boxesNeeded; i++)
                 {
                     manager.AddShoppingListProduct(productID, finalProductPrice);
                 }
             }
         }
-        
+
         private static bool IsProductInShoppingList(ManagerBlackboard manager, int productID)
         {
+            if (manager.shoppingListParent == null) return false;
             foreach (Transform item in manager.shoppingListParent.transform)
             {
                 InteractableData data = item.GetComponent<InteractableData>();
                 if (data != null && data.thisSkillIndex == productID)
                 {
-                    // Product is already in the shopping list
                     return true;
                 }
             }
-
             return false;
         }
     }
@@ -578,6 +849,9 @@ namespace SMTQualityOfLife.Patches
                         break;
                     case "lowCountAddToCart":
                         text = text + "Low Count Products: Added almost out of stock products to cart.";
+                        break;
+                    case "lowCountThresholdToggle":
+                        text = text + $"Low Count Products: Threshold set to {LowCountProducts.ActiveThresholdName} ({LowCountProducts.ActiveThreshold}).";
                         break;
                 }
 

@@ -35,6 +35,7 @@ namespace SMTQualityOfLife
 
         // === KEYBOARD SHORTCUTS
         private static ConfigEntry<KeyboardShortcut> _keyboardShortcutEnableMainWindow;
+        private static ConfigEntry<KeyboardShortcut> _keyboardShortcutToggleThreshold;
         private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpBlackboard;
         private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpAchievements;
         private static ConfigEntry<KeyboardShortcut> _keyboardShortcutDumpSkills;
@@ -49,6 +50,10 @@ namespace SMTQualityOfLife
             _keyboardShortcutEnableMainWindow = Config.Bind("General",
                 "KeyboardShortcutEnableMainWindowKey", new KeyboardShortcut(KeyCode.H, new[] { KeyCode.LeftControl }),
                 (ConfigDescription.Empty));
+            _keyboardShortcutToggleThreshold = Config.Bind("General",
+                "LowCountProducts ToggleThresholdHotkey", new KeyboardShortcut(KeyCode.Y, new[] { KeyCode.LeftControl }),
+                "Hotkey to toggle between the Low and High threshold values used by 'Add Low Count Products'. " +
+                "Press the key while in-game (no other UI blocking the input) to switch. Rebindable via BepInEx config.");
             _keyboardShortcutDumpBlackboard = Config.Bind("General",
                 "KeyboardShortcutDumpBlackboard", new KeyboardShortcut(KeyCode.F7, new[] { KeyCode.LeftControl }),
                 (ConfigDescription.Empty));
@@ -134,6 +139,16 @@ namespace SMTQualityOfLife
                     IsCheckoutVolumeWindowEnabled.Value = false;
                     Cursor.lockState = CursorLockMode.None;
                     Cursor.visible = true;
+                }
+            }
+
+            if (_keyboardShortcutToggleThreshold.Value.IsDown())
+            {
+                if (LowCountProducts.LowCountProductsState)
+                {
+                    LowCountProducts.ToggleActiveThreshold();
+                    LowCountProducts.NotificationType = "lowCountThresholdToggle";
+                    LowCountProducts.Notify = true;
                 }
             }
 
