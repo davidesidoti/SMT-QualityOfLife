@@ -12,7 +12,10 @@ A BepInEx mod for the Unity game **Supermarket Together** that enhances your gam
 ### LowCountProducts Mod
 
 - **Quick Restock**: Adds an "Add Low Count Products" button to the manager's blackboard that automatically adds all low-stock products to your shopping cart.
-- **Configurable Threshold**: Set the minimum stock level that triggers a product to be considered "low count".
+- **Two Thresholds + Hotkey Toggle**: Configure independent Low (default 20) and High (default 60) thresholds; press `Ctrl + Y` in-game to flip between them (rebindable in `BepInEx/config/SMTQualityOfLife.cfg` under `LowCountProducts ToggleThresholdHotkey`).
+- **Total-Stock Check**: Compares shelves + storage + unopened boxes against the active threshold, so already-stocked products aren't re-ordered.
+- **Three Add Modes**: `Original` (legacy: skip products with backup stock, skip if already in cart), `One Box Per Click` (adds 1 box per click, click again to add more), and `Auto-Fill` (computes the boxes needed to reach the threshold and adds them all in one click).
+- **In-Window Toggle**: A "Switch to Low / Switch to High" button in the settings window mirrors the hotkey for players who prefer the GUI.
 
 ### SmartPrices Mod
 
